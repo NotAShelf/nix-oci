@@ -96,11 +96,11 @@
 
       # Produce a docker-archive tarball for "docker load"
       exportDockerArchive = ociImage:
-        pkgs.runCommandNoCC "docker-archive.tar" {buildInputs = [pkgs.gnutar pkgs.coreutils];} ''
+        pkgs.runCommandNoCC "docker-archive.tar" {buildInputs = with pkgs; [gnutar coreutils jq];} ''
           mkdir work
           cp -r ${ociImage} work/oci
 
-          # Extract digest shas
+          # Extract digest SHAs
           CFG_SHA=$(jq -r '.config.digest' work/oci/manifest.json | cut -d: -f2)
           LAYER_SHA=$(jq -r '.layers[0].digest' work/oci/manifest.json | cut -d: -f2)
 
@@ -108,7 +108,7 @@
           cp work/oci/blobs/sha256/$CFG_SHA work/docker/$CFG_SHA.json
           cp work/oci/blobs/sha256/$LAYER_SHA work/docker/layer.tar
 
-          # docker manifest
+          # Docker manifest
           cat > work/docker/manifest.json <<EOF
           [
             {
