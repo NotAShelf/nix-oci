@@ -16,7 +16,7 @@
       # FIXME: this would be the module system result producing RootFS.
       # Since I *cannot* be arsed to figure out a RootFS derivation right
       # now, this temporary placeholder will do.
-      myRootFS = pkgs.stdenv.mkDerivation {
+      myRootFS = pkgs.stdenvNoCC.mkDerivation {
         name = "my-rootfs";
         buildInputs = [pkgs.busybox pkgs.coreutils pkgs.gnutar pkgs.openssl];
         buildCommand = ''
@@ -44,7 +44,7 @@
         imageName ? "myimage",
         arch ? "amd64",
       }:
-        pkgs.stdenv.mkDerivation {
+        pkgs.stdenvNoCC.mkDerivation {
           name = "${imageName}-oci";
           buildInputs = [pkgs.gnutar pkgs.coreutils];
           buildCommand = ''
@@ -97,11 +97,34 @@
       # Produce a docker-archive tarball for "docker load"
       exportDockerArchive = ociImage:
         pkgs.runCommandNoCC "docker-archive.tar" {buildInputs = [pkgs.gnutar pkgs.coreutils];} ''
-          mkdir -p tmpimage
-          cp -r ${ociImage} tmpimage/oci
+          mkdir work
+          cp -r ${ociImage} work/oci
 
-          # Pack as docker-archive (single image)
-          tar -C tmpimage -cf $out .
+          # Extract digest shas
+          CFG_SHA=$(jq -r '.config.digest' work/oci/manifest.json | cut -d: -f2)
+          LAYER_SHA=$(jq -r '.layers[0].digest' work/oci/manifest.json | cut -d: -f2)
+
+          mkdir -p work/docker
+          cp work/oci/blobs/sha256/$CFG_SHA work/docker/$CFG_SHA.json
+          cp work/oci/blobs/sha256/$LAYER_SHA work/docker/layer.tar
+
+          # docker manifest
+          cat > work/docker/manifest.json <<EOF
+          [
+            {
+              "Config": "$CFG_SHA.json",
+              "RepoTags": ["myimage:latest"],
+              "Layers": ["layer.tar"]
+            }
+          ]
+          EOF
+
+          # Repositories file
+          cat > work/docker/repositories <<EOF
+          {"myimage":{"latest":"$CFG_SHA"}}
+          EOF
+
+          tar -C work/docker -cf $out .
         '';
     in {
       ociImage = buildOCIImage {
