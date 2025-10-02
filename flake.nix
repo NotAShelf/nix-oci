@@ -96,17 +96,24 @@
 
       # Produce a docker-archive tarball for "docker load"
       exportDockerArchive = ociImage:
-        pkgs.runCommandNoCC "docker-archive.tar" {buildInputs = with pkgs; [gnutar coreutils jq];} ''
+        pkgs.runCommandNoCC "export-docker-archive" {
+          buildInputs = with pkgs; [gnutar coreutils jq];
+        } ''
           mkdir work
           cp -r ${ociImage} work/oci
 
-          # Extract digest SHAs
-          CFG_SHA=$(jq -r '.config.digest' work/oci/manifest.json | cut -d: -f2)
-          LAYER_SHA=$(jq -r '.layers[0].digest' work/oci/manifest.json | cut -d: -f2)
+          # The OCI spec:
+          # index.json -> manifest blob -> config + layers
+          INDEX=work/oci/index.json
+          M_DIGEST=$(jq -r '.manifests[0].digest' "$INDEX" | cut -d: -f2)
+          MANIFEST_BLOB="work/oci/blobs/sha256/$M_DIGEST"
+
+          CFG_SHA=$(jq -r '.config.digest' "$MANIFEST_BLOB" | cut -d: -f2)
+          LAYER_SHA=$(jq -r '.layers[0].digest' "$MANIFEST_BLOB" | cut -d: -f2)
 
           mkdir -p work/docker
-          cp work/oci/blobs/sha256/$CFG_SHA work/docker/$CFG_SHA.json
-          cp work/oci/blobs/sha256/$LAYER_SHA work/docker/layer.tar
+          cp "work/oci/blobs/sha256/$CFG_SHA" "work/docker/$CFG_SHA.json"
+          cp "work/oci/blobs/sha256/$LAYER_SHA" "work/docker/layer.tar"
 
           # Docker manifest
           cat > work/docker/manifest.json <<EOF
