@@ -1,0 +1,26 @@
+name: Build and Test OCI Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Build OCI Image
+        run: nix build .#dockerArchive -o result
+
+      - name: Load into Docker
+        run: |
+          docker load -i result
+          docker images
+
