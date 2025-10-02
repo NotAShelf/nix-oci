@@ -1,5 +1,5 @@
 {
-  inputs.nixpkgs.url = "nixpkgs"; # FIXME: this is not reproducible, but it's budget-friendly for low bandwidth :)
+  inputs.nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
 
   outputs = {
     self,
